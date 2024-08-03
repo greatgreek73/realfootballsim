@@ -1,0 +1,111 @@
+from django.db import transaction
+from .models import League, Championship, ChampionshipParticipation, Season
+from clubs.models import Club
+import random
+from django.utils import timezone
+
+def create_or_get_current_season():
+    current_year = timezone.now().year
+    season, created = Season.objects.get_or_create(
+        year=current_year,
+        defaults={
+            'start_date': f'{current_year}-08-01',
+            'end_date': f'{current_year+1}-05-31'
+        }
+    )
+    return season
+
+@transaction.atomic
+def create_championships_for_season(season):
+    leagues = League.objects.all()
+    for league in leagues:
+        Championship.objects.create(league=league, season=season)
+
+@transaction.atomic
+def fill_championship_with_computer_teams(championship):
+    current_teams = ChampionshipParticipation.objects.filter(championship=championship).count()
+    teams_needed = championship.league.max_teams - current_teams
+
+    if teams_needed > 0:
+        for i in range(teams_needed):
+            computer_club = Club.objects.create(
+                name=f"Computer Team {i+1} - {championship.league.country.name}",
+                country=championship.league.country.code,
+                is_computer_managed=True,
+                current_league=championship.league,
+                current_championship=championship
+            )
+            ChampionshipParticipation.objects.create(championship=championship, club=computer_club)
+
+@transaction.atomic
+def add_club_to_championship(club):
+    country = club.country
+    lowest_league = League.objects.filter(country=country).order_by('-level').first()
+    
+    if not lowest_league:
+        # Если лиги для этой страны нет, создаем новую
+        lowest_league = League.objects.create(name=f"{country.name} League", country=country, level=1)
+    
+    current_season = create_or_get_current_season()
+    championship = Championship.objects.get(league=lowest_league, season=current_season)
+    
+    if ChampionshipParticipation.objects.filter(championship=championship).count() < lowest_league.max_teams:
+        ChampionshipParticipation.objects.create(championship=championship, club=club)
+        club.current_league = lowest_league
+        club.current_championship = championship
+        club.save()
+    else:
+        # Если в текущем чемпионате нет мест, создаем новую лигу более низкого уровня
+        new_league = League.objects.create(
+            name=f"{country.name} League {lowest_league.level + 1}",
+            country=country,
+            level=lowest_league.level + 1
+        )
+        new_championship = Championship.objects.create(league=new_league, season=current_season)
+        ChampionshipParticipation.objects.create(championship=new_championship, club=club)
+        club.current_league = new_league
+        club.current_championship = new_championship
+        club.save()
+
+@transaction.atomic
+def end_season_and_promote_relegate():
+    current_season = create_or_get_current_season()
+    championships = Championship.objects.filter(season=current_season)
+
+    for championship in championships:
+        league = championship.league
+        if league.level > 1:
+            # Повышение команд
+            top_teams = ChampionshipParticipation.objects.filter(championship=championship).order_by('-points')[:2]
+            higher_league = League.objects.get(country=league.country, level=league.level-1)
+            higher_championship = Championship.objects.get(league=higher_league, season=current_season)
+            
+            for team in top_teams:
+                team.club.current_league = higher_league
+                team.club.current_championship = higher_championship
+                team.club.save()
+                ChampionshipParticipation.objects.create(championship=higher_championship, club=team.club)
+            
+            # Понижение команд
+            bottom_teams = ChampionshipParticipation.objects.filter(championship=higher_championship).order_by('points')[:2]
+            for team in bottom_teams:
+                team.club.current_league = league
+                team.club.current_championship = championship
+                team.club.save()
+                ChampionshipParticipation.objects.create(championship=championship, club=team.club)
+
+    # Создаем новый сезон и чемпионаты для него
+    new_season = Season.objects.create(
+        year=current_season.year + 1,
+        start_date=f'{current_season.year + 1}-08-01',
+        end_date=f'{current_season.year + 2}-05-31'
+    )
+    create_championships_for_season(new_season)
+
+    # Переносим все клубы в новые чемпионаты
+    clubs = Club.objects.all()
+    for club in clubs:
+        new_championship = Championship.objects.get(league=club.current_league, season=new_season)
+        club.current_championship = new_championship
+        club.save()
+        ChampionshipParticipation.objects.create(championship=new_championship, club=club)

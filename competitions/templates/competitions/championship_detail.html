@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>{{ championship }}</h1>
+  <h2>Standings</h2>
+  <table>
+    <tr>
+      <th>Position</th>
+      <th>Club</th>
+      <th>Points</th>
+      <th>Played</th>
+      <th>Won</th>
+      <th>Drawn</th>
+      <th>Lost</th>
+      <th>Goals For</th>
+      <th>Goals Against</th>
+    </tr>
+    {% for standing in standings %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ standing.club.name }}</td>
+        <td>{{ standing.points }}</td>
+        <td>{{ standing.games_played }}</td>
+        <td>{{ standing.wins }}</td>
+        <td>{{ standing.draws }}</td>
+        <td>{{ standing.losses }}</td>
+        <td>{{ standing.goals_for }}</td>
+        <td>{{ standing.goals_against }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9">No teams in this championship yet.</td></tr>
+    {% endfor %}
+  </table>
+{% endblock %}
