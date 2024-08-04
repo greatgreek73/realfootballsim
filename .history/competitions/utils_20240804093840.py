@@ -3,7 +3,6 @@ from django.utils import timezone
 from .models import League, Championship, ChampionshipParticipation, Season
 from clubs.models import Club
 import random
-from competitions.models import Country
 
 def create_or_get_current_season():
     current_year = timezone.now().year
@@ -46,14 +45,13 @@ def fill_championship_with_computer_teams(championship):
 
 @transaction.atomic
 def add_club_to_championship(club):
-    country_code = club.country.code
-    lowest_league = League.objects.filter(country__code=country_code).order_by('-level').first()
+    country = club.country
+    lowest_league = League.objects.filter(country=country).order_by('-level').first()
     
-    print(f"Adding club {club.name} to championship. Country: {country_code}, Lowest league: {lowest_league}")
+    print(f"Adding club {club.name} to championship. Country: {country}, Lowest league: {lowest_league}")
     
     if not lowest_league:
-        print(f"No league found for country {country_code}. Creating a new one.")
-        country = Country.objects.get(code=country_code)
+        print(f"No league found for country {country}. Creating a new one.")
         lowest_league = League.objects.create(name=f"{country.name} League", country=country, level=1)
     
     current_season = create_or_get_current_season()

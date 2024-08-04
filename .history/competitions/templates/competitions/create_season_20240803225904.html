@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Create Club{% endblock %}
+{% block title %}Create New Season{% endblock %}
 
 {% block content %}
-<h1>Create Your Club</h1>
+<h1>Create New Season and Championships</h1>
 
 <form method="post">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Create Club</button>
+    <p>Are you sure you want to create a new season and generate championships?</p>
+    <button type="submit" class="btn btn-primary">Create Season</button>
 </form>
 
 {% if messages %}

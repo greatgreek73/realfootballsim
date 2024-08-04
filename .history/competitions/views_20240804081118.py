@@ -1,6 +1,6 @@
 from django.views.generic import ListView, DetailView
 from django.contrib.admin.views.decorators import staff_member_required
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
 from django.contrib import messages
 from .models import Championship, ChampionshipParticipation, Season, League
 from .utils import create_or_get_current_season, create_championships_for_season, fill_championship_with_computer_teams

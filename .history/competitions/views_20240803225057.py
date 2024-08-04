@@ -1,8 +1,8 @@
 from django.views.generic import ListView, DetailView
 from django.contrib.admin.views.decorators import staff_member_required
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
 from django.contrib import messages
-from .models import Championship, ChampionshipParticipation, Season, League
+from .models import Championship, ChampionshipParticipation
 from .utils import create_or_get_current_season, create_championships_for_season, fill_championship_with_computer_teams
 
 class ChampionshipListView(ListView):
@@ -22,21 +22,12 @@ class ChampionshipDetailView(DetailView):
 
 @staff_member_required
 def create_season_and_championships(request):
-    if request.method == 'POST':
-        season = create_or_get_current_season()
-        leagues = League.objects.all()
-        
-        for league in leagues:
-            championship, created = Championship.objects.get_or_create(
-                league=league,
-                season=season
-            )
-            if created:
-                fill_championship_with_computer_teams(championship)
-                messages.success(request, f"Created championship for {league.name} and filled with computer teams.")
-            else:
-                messages.info(request, f"Championship for {league.name} already exists.")
-        
-        return redirect('competitions:championship_list')
+    season = create_or_get_current_season()
+    create_championships_for_season(season)
+    championships = Championship.objects.filter(season=season)
     
-    return render(request, 'competitions/create_season.html')
+    for championship in championships:
+        fill_championship_with_computer_teams(championship)
+    
+    messages.success(request, f"New season {season} created with championships and filled with computer teams.")
+    return redirect('admin:index')

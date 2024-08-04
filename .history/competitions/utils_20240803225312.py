@@ -3,7 +3,6 @@ from django.utils import timezone
 from .models import League, Championship, ChampionshipParticipation, Season
 from clubs.models import Club
 import random
-from competitions.models import Country
 
 def create_or_get_current_season():
     current_year = timezone.now().year
@@ -46,32 +45,24 @@ def fill_championship_with_computer_teams(championship):
 
 @transaction.atomic
 def add_club_to_championship(club):
-    country_code = club.country.code
-    lowest_league = League.objects.filter(country__code=country_code).order_by('-level').first()
-    
-    print(f"Adding club {club.name} to championship. Country: {country_code}, Lowest league: {lowest_league}")
+    country = club.country
+    lowest_league = League.objects.filter(country=country).order_by('-level').first()
     
     if not lowest_league:
-        print(f"No league found for country {country_code}. Creating a new one.")
-        country = Country.objects.get(code=country_code)
         lowest_league = League.objects.create(name=f"{country.name} League", country=country, level=1)
     
     current_season = create_or_get_current_season()
-    championship, created = Championship.objects.get_or_create(league=lowest_league, season=current_season)
-    
-    print(f"Championship: {championship}, Created: {created}")
+    championship = Championship.objects.get(league=lowest_league, season=current_season)
     
     participations = ChampionshipParticipation.objects.filter(championship=championship)
     if participations.count() < lowest_league.max_teams:
         ChampionshipParticipation.objects.create(championship=championship, club=club)
-        print(f"Added {club.name} to {championship}")
     else:
         # Заменяем компьютерную команду на новую
         computer_team = participations.filter(club__is_computer_managed=True).first()
         if computer_team:
             computer_team.club.delete()
             ChampionshipParticipation.objects.create(championship=championship, club=club)
-            print(f"Replaced computer team with {club.name} in {championship}")
         else:
             # Если нет компьютерных команд, создаем новую лигу
             new_league = League.objects.create(
@@ -82,15 +73,10 @@ def add_club_to_championship(club):
             new_championship = Championship.objects.create(league=new_league, season=current_season)
             ChampionshipParticipation.objects.create(championship=new_championship, club=club)
             championship = new_championship
-            print(f"Created new league and championship for {club.name}: {championship}")
     
     club.current_league = championship.league
     club.current_championship = championship
     club.save()
-    
-    print(f"Final club state: League: {club.current_league}, Championship: {club.current_championship}")
-    
-    return championship
 
 @transaction.atomic
 def end_season_and_promote_relegate():

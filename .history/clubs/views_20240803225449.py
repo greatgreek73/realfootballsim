@@ -12,7 +12,6 @@ from .country_locales import country_locales
 from players.utils import generate_player_stats
 from competitions.utils import add_club_to_championship
 import json
-import traceback
 
 class CreateClubView(CreateView):
     model = Club
@@ -24,18 +23,11 @@ class CreateClubView(CreateView):
         club.owner = self.request.user
         club.save()
         
-        print(f"Club created: {club.name}, Country: {club.country.code}")
-        
         try:
             championship = add_club_to_championship(club)
             messages.success(self.request, f"Your club {club.name} has been created and added to {championship}!")
-            print(f"Club added to championship: {championship}")
         except Exception as e:
-            print(f"Error adding club to championship: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
             messages.error(self.request, f"Your club was created, but there was an error adding it to a championship: {str(e)}")
-        
-        print(f"Final club state: League: {club.current_league}, Championship: {club.current_championship}")
         
         return redirect(reverse('clubs:club_detail', kwargs={'pk': club.pk}))
 
